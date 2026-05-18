@@ -1,6 +1,8 @@
 # Credenciais
 .env
 .env.local
+.env.secrets
+!.env.secrets.example
 
 # Terraform
 .terraform/
