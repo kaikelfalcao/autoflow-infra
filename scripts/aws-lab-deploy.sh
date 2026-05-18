@@ -13,12 +13,11 @@ ROOT_DIR="$(cd "$INFRA_DIR/.." && pwd)"
 
 SKIP_BUILD=false
 SKIP_TF=false
-ONLY_APPS=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-build) SKIP_BUILD=true; shift ;;
     --skip-tf)    SKIP_TF=true; shift ;;
-    --only-apps)  ONLY_APPS=true; SKIP_TF=true; SKIP_BUILD=true; shift ;;
+    --only-apps)  SKIP_TF=true; SKIP_BUILD=true; shift ;;
     -h|--help) sed -n '1,8p' "$0"; exit 0 ;;
     *) echo "arg desconhecido: $1" >&2; exit 1 ;;
   esac
@@ -89,15 +88,13 @@ if [ "$SKIP_TF" = false ]; then
   cd "$INFRA_DIR/02-database-rds"
   terraform init -reconfigure -backend-config="bucket=$TFSTATE_BUCKET" >/dev/null
 
-  # Detecta mudança no parameter group ANTES de aplicar — vai exigir reboot
-  PG_BEFORE=$(terraform state show aws_db_parameter_group.pg16 2>/dev/null | grep -c 'rds.force_ssl' || echo 0)
   terraform apply -auto-approve -var-file=environments/dev.tfvars
 
   # Se rds.force_ssl mudou (ou é primeiro deploy), reboot para aplicar pending-reboot params
   RDS_ID=$(terraform output -raw db_address | cut -d. -f1)
   echo "→ reboot RDS para aplicar pending-reboot params (~1 min)"
   aws rds reboot-db-instance --db-instance-identifier "$RDS_ID" --region "$AWS_REGION" >/dev/null 2>&1 || true
-  for i in $(seq 1 60); do
+  for _ in $(seq 1 60); do
     st=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --region "$AWS_REGION" --query 'DBInstances[0].DBInstanceStatus' --output text)
     [ "$st" = "available" ] && break
     sleep 10
@@ -113,7 +110,7 @@ ok "kubectl conectado a $CLUSTER_NAME"
 
 # Espera EBS CSI ficar ACTIVE (Terraform aplica addon mas pods levam alguns segundos)
 echo "→ aguardando EBS CSI controller pronto"
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
   ready=$(kubectl get pods -n kube-system -l app=ebs-csi-controller -o jsonpath='{.items[?(@.status.phase=="Running")].status.containerStatuses[?(@.ready==true)].name}' 2>/dev/null | wc -w)
   [ "$ready" -ge 6 ] && break
   sleep 5
@@ -236,7 +233,8 @@ RMQ_URL="amqp://admin:${RMQ_PASS}@rabbitmq.autoflow.svc.cluster.local:5672"
 apply_pg_secret() {
   local key="$1"; local svc="$2"; local extra="${3:-}"
   local user_var="${key}_user"
-  local pw=$(echo "$SVC_CREDS" | python3 -c "import json,sys;print(json.load(sys.stdin)['$key']['password'])")
+  local pw
+  pw=$(echo "$SVC_CREDS" | python3 -c "import json,sys;print(json.load(sys.stdin)['$key']['password'])")
   kubectl create secret generic "${svc}-secrets" -n autoflow \
     --from-literal=NODE_ENV=production \
     --from-literal=DATABASE_HOST="$DB_HOST" \
@@ -412,7 +410,7 @@ ok "NLB Kong: http://${NLB_HOST}"
 
 echo ""
 echo "→ Aguardando NLB ficar accessible (até 3 min)…"
-for i in $(seq 1 36); do
+for _ in $(seq 1 36); do
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X POST \
     -H 'Content-Type: application/json' -d '{}' \
     "http://${NLB_HOST}/auth/login/admin" 2>/dev/null || echo "000")

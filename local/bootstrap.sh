@@ -78,7 +78,10 @@ ok "docker, kind, kubectl, helm, envsubst OK"
 
 ENV_FILE="$ROOT_DIR/autoflow-infra/.env"
 if [ -f "$ENV_FILE" ]; then
-  set -a; . "$ENV_FILE"; set +a
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
   : "${NEW_RELIC_ENABLED:=true}"
   ok ".env carregado (NEW_RELIC_ENABLED=$NEW_RELIC_ENABLED)"
 else

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/aws-lab-login.sh" >/dev/null
 
-CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+CYAN='\033[0;36m'; NC='\033[0m'
 banner() { echo; echo -e "${CYAN}══ $* ══${NC}"; }
 
 banner "EKS Cluster"

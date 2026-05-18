@@ -8,7 +8,10 @@ ENV_FILE="$SCRIPT_DIR/../.env"
 
 [ -f "$ENV_FILE" ] || { echo "✗ .env não encontrado em $ENV_FILE" >&2; return 1 2>/dev/null || exit 1; }
 
-set -a; . "$ENV_FILE"; set +a
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
 
 : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID não definido no .env}"
 : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY não definido no .env}"

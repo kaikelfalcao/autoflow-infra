@@ -4,7 +4,7 @@
 
 terraform {
   backend "s3" {
-    bucket  = "autoflow-tfstate"     # sobrescrever via -backend-config se necessário
+    bucket  = "autoflow-tfstate" # sobrescrever via -backend-config se necessário
     key     = "network-eks/terraform.tfstate"
     region  = "us-east-1"
     encrypt = true

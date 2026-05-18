@@ -40,7 +40,7 @@ echo -e "${GREEN}   ✓ payment-service em 1 replica${NC}"
 echo ""
 echo -e "${YELLOW}→ Aguardando Kong rotear para identity-service…${NC}"
 KONG_OK=false
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
     -H 'Content-Type: application/json' -d '{}' \
     http://localhost:8080/auth/login/admin 2>/dev/null || true)
