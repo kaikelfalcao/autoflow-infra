@@ -1,0 +1,17 @@
+# Cluster kind para teste local do autoflow.
+# Single-node (control-plane também roda workloads).
+# Mapeia porta 8080 do host para NodePort 30080 do Kong proxy.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: autoflow
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Kong HTTP — qualquer chamada em http://localhost:8080 vai para Kong
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      # RabbitMQ Management UI — http://localhost:15672
+      - containerPort: 30672
+        hostPort: 15672
+        protocol: TCP

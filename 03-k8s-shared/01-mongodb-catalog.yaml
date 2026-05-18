@@ -1,0 +1,80 @@
+# MongoDB para o catalog-service — instância isolada com PVC próprio.
+# Database lógico: catalog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-catalog
+  namespace: autoflow
+  labels:
+    app: mongodb-catalog
+spec:
+  clusterIP: None  # headless service para StatefulSet
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongo
+  selector:
+    app: mongodb-catalog
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-catalog-auth
+  namespace: autoflow
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_USERNAME: catalog_admin
+  # gerar via: openssl rand -base64 32
+  MONGO_INITDB_ROOT_PASSWORD: REPLACE_ME_VIA_KUBECTL
+  MONGO_INITDB_DATABASE: catalog
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-catalog
+  namespace: autoflow
+spec:
+  serviceName: mongodb-catalog
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-catalog
+  template:
+    metadata:
+      labels:
+        app: mongodb-catalog
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7-jammy
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongodb-catalog-auth
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # tcpSocket porque mongosh ping retorna Unauthorized quando auth ativa
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

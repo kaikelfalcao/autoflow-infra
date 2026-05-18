@@ -1,0 +1,79 @@
+# MongoDB para o notification-service — instância isolada (separada do catalog).
+# Database lógico: notification
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-notification
+  namespace: autoflow
+  labels:
+    app: mongodb-notification
+spec:
+  clusterIP: None
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongo
+  selector:
+    app: mongodb-notification
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-notification-auth
+  namespace: autoflow
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_USERNAME: notification_admin
+  MONGO_INITDB_ROOT_PASSWORD: REPLACE_ME_VIA_KUBECTL
+  MONGO_INITDB_DATABASE: notification
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-notification
+  namespace: autoflow
+spec:
+  serviceName: mongodb-notification
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-notification
+  template:
+    metadata:
+      labels:
+        app: mongodb-notification
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7-jammy
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongodb-notification-auth
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # tcpSocket porque mongosh ping retorna Unauthorized quando auth ativa
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
