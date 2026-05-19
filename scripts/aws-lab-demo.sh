@@ -32,8 +32,11 @@ while [ $# -gt 0 ]; do
 done
 
 # ── cores (escape real, não literal — funciona tanto com echo quanto com printf)
-CYAN=$'\033[0;36m'; BCYAN=$'\033[1;36m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'
+# shellcheck disable=SC2034
+{
+BCYAN=$'\033[1;36m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'
 BLUE=$'\033[0;34m'; MAGENTA=$'\033[0;35m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; NC=$'\033[0m'
+}
 
 section() {
   local num="$1"; shift
@@ -273,7 +276,8 @@ sec5() {
   section 5 "Rastreamento distribuído — correlation_id propagando entre 6 serviços"
   note "Ponto: ${BOLD}\"Monitoramento e rastreamento dos fluxos distribuídos\"${NC}"
 
-  local CID="demo-$(date +%s)-$(openssl rand -hex 3)"
+  local CID
+  CID="demo-$(date +%s)-$(openssl rand -hex 3)"
   step "correlation_id da demo: ${BOLD}${CID}${NC}"
   note "Vamos rodar um fluxo completo (login + criar OS + aprovar budget + executar)"
   note "com X-Correlation-Id fixo. _paths.py injeta esse header em todas as chamadas HTTP."
