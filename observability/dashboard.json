@@ -1,32 +1,46 @@
 {
   "name": "Autoflow — Negócio + APM",
-  "description": "",
+  "description": "Métricas de negócio (AutoflowBizEvent) e APM dos 6 microsserviços do autoflow. Atualizado para refletir os eventos custom emitidos via recordBusinessEvent.",
   "permissions": "PUBLIC_READ_WRITE",
   "pages": [
     {
       "name": "Negócio",
-      "description": "",
+      "description": "Funnel de OS → orçamento → cobrança → pagamento + métricas de saga e estoque.",
       "widgets": [
         {
-          "title": "Funnel de Ordens de Serviço",
+          "title": "Funnel: OS criada → aprovada → cobrada → paga → cancelada",
           "visualization": { "id": "viz.bar" },
-          "layout": { "column": 1, "row": 1, "width": 6, "height": 3 },
+          "layout": { "column": 1, "row": 1, "width": 8, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": true },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT count(*) FROM AutoflowBizEvent WHERE eventName IN ('OrderCreated','BudgetApproved','OrderCancelled','PaymentApproved') FACET CASES (WHERE eventName='OrderCreated' AS '1. Criadas', WHERE eventName='BudgetApproved' AS '2. Budget aprovado', WHERE eventName='PaymentApproved' AS '3. Pagas', WHERE eventName='OrderCancelled' AS '4. Canceladas') SINCE 1 day ago"
+                "query": "SELECT count(*) FROM AutoflowBizEvent WHERE eventName IN ('OrderCreated','BudgetApproved','ChargeCreated','PaymentApproved','OrderCancelled') FACET CASES (WHERE eventName='OrderCreated' AS '1. OS criada', WHERE eventName='BudgetApproved' AS '2. Orçamento aprovado', WHERE eventName='ChargeCreated' AS '3. Cobrança gerada', WHERE eventName='PaymentApproved' AS '4. Pagamento aprovado', WHERE eventName='OrderCancelled' AS 'X. Cancelada') SINCE 1 day ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
           }
         },
         {
-          "title": "Conversão pagamento (aprovado vs rejeitado)",
+          "title": "R$ aprovado (24h)",
+          "visualization": { "id": "viz.billboard" },
+          "layout": { "column": 9, "row": 1, "width": 2, "height": 3 },
+          "rawConfiguration": {
+            "thresholds": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT sum(totalCents)/100 AS 'R$ aprovado' FROM AutoflowBizEvent WHERE eventName='PaymentApproved' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Conversão pagamento",
           "visualization": { "id": "viz.pie" },
-          "layout": { "column": 7, "row": 1, "width": 3, "height": 3 },
+          "layout": { "column": 11, "row": 1, "width": 2, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": true },
@@ -39,23 +53,53 @@
           }
         },
         {
-          "title": "Valor R$ aprovado (acumulado)",
-          "visualization": { "id": "viz.billboard" },
-          "layout": { "column": 10, "row": 1, "width": 3, "height": 3 },
+          "title": "Status atual das OSs (distribuição)",
+          "visualization": { "id": "viz.pie" },
+          "layout": { "column": 1, "row": 4, "width": 4, "height": 3 },
           "rawConfiguration": {
-            "thresholds": [],
+            "facet": { "showOtherSeries": false },
+            "legend": { "enabled": true },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT sum(totalCents)/100 AS 'R$ aprovado' FROM AutoflowBizEvent WHERE eventName='PaymentApproved' SINCE 1 day ago"
+                "query": "SELECT latest(toStatus) FROM AutoflowBizEvent WHERE eventName='OrderStatusChanged' FACET orderId SINCE 1 day ago LIMIT MAX"
               }
             ]
           }
         },
         {
-          "title": "Tempo médio da saga (RESERVED → CONSUMED)",
+          "title": "Tempo médio de execução de OS (s)",
           "visualization": { "id": "viz.line" },
-          "layout": { "column": 1, "row": 4, "width": 6, "height": 3 },
+          "layout": { "column": 5, "row": 4, "width": 4, "height": 3 },
+          "rawConfiguration": {
+            "legend": { "enabled": true },
+            "yAxisLeft": { "zero": true },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT average(durationMs)/1000 AS 'Duração média (s)', percentile(durationMs, 95)/1000 AS 'p95 (s)' FROM AutoflowBizEvent WHERE eventName='ExecutionCompleted' TIMESERIES SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "OS canceladas (motivos)",
+          "visualization": { "id": "viz.table" },
+          "layout": { "column": 9, "row": 4, "width": 4, "height": 3 },
+          "rawConfiguration": {
+            "facet": { "showOtherSeries": false },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT count(*) AS 'Qtd', latest(changedBy) AS 'Por' FROM AutoflowBizEvent WHERE eventName='OrderCancelled' FACET reason SINCE 1 day ago LIMIT 20"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Saga: tempo médio (reserva e completa, em s)",
+          "visualization": { "id": "viz.line" },
+          "layout": { "column": 1, "row": 7, "width": 6, "height": 3 },
           "rawConfiguration": {
             "legend": { "enabled": true },
             "yAxisLeft": { "zero": true },
@@ -70,22 +114,36 @@
         {
           "title": "Saga: sucessos vs falhas",
           "visualization": { "id": "viz.stacked-bar" },
-          "layout": { "column": 7, "row": 4, "width": 6, "height": 3 },
+          "layout": { "column": 7, "row": 7, "width": 6, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": true },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT count(*) FROM AutoflowBizEvent WHERE eventName IN ('SagaReserved','SagaConsumed','SagaReservationFailed') FACET eventName TIMESERIES 5 minutes SINCE 1 hour ago"
+                "query": "SELECT count(*) FROM AutoflowBizEvent WHERE eventName IN ('SagaReserved','SagaConsumed','SagaReservationFailed','SagaCompensation') FACET eventName TIMESERIES 5 minutes SINCE 1 hour ago"
               }
             ]
           }
         },
         {
-          "title": "Movimento de estoque (RESERVE + OUT)",
+          "title": "Compensações de saga (origem)",
+          "visualization": { "id": "viz.table" },
+          "layout": { "column": 1, "row": 10, "width": 5, "height": 3 },
+          "rawConfiguration": {
+            "facet": { "showOtherSeries": false },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT count(*) AS 'Qtd' FROM AutoflowBizEvent WHERE eventName='SagaCompensation' FACET step, reason SINCE 1 day ago LIMIT 50"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Movimento de estoque (RESERVE + CONSUME)",
           "visualization": { "id": "viz.line" },
-          "layout": { "column": 1, "row": 7, "width": 8, "height": 3 },
+          "layout": { "column": 6, "row": 10, "width": 7, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": true },
@@ -99,9 +157,37 @@
           }
         },
         {
-          "title": "Estoque insuficiente (eventos)",
+          "title": "Estoque insuficiente (peças que travaram saga)",
+          "visualization": { "id": "viz.table" },
+          "layout": { "column": 1, "row": 13, "width": 6, "height": 3 },
+          "rawConfiguration": {
+            "facet": { "showOtherSeries": false },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT count(*) AS 'Faltas', sum(requested) AS 'Pedidos', sum(available) AS 'Disponível na hora' FROM AutoflowBizEvent WHERE eventName='StockInsufficient' FACET partId SINCE 1 day ago LIMIT 25"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Alertas de estoque mínimo (StockLowAlert)",
+          "visualization": { "id": "viz.table" },
+          "layout": { "column": 7, "row": 13, "width": 6, "height": 3 },
+          "rawConfiguration": {
+            "facet": { "showOtherSeries": false },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT latest(name) AS 'Peça', latest(sku) AS 'SKU', latest(currentStock) AS 'Estoque atual', latest(minimumStock) AS 'Mínimo', latest(timestamp) AS 'Última detecção' FROM AutoflowBizEvent WHERE eventName='StockLowAlert' FACET partId SINCE 1 week ago LIMIT 50"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Estoque insuficiente vs alertas mínimo (contadores)",
           "visualization": { "id": "viz.billboard" },
-          "layout": { "column": 9, "row": 7, "width": 4, "height": 3 },
+          "layout": { "column": 1, "row": 16, "width": 4, "height": 2 },
           "rawConfiguration": {
             "thresholds": [
               { "alertSeverity": "WARNING", "value": 1 },
@@ -110,7 +196,36 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT count(*) AS 'StockInsufficient', uniqueCount(partId) AS 'Peças distintas' FROM AutoflowBizEvent WHERE eventName='StockInsufficient' SINCE 1 day ago"
+                "query": "SELECT filter(count(*), WHERE eventName='StockInsufficient') AS 'Insufficient (24h)', filter(count(*), WHERE eventName='StockLowAlert') AS 'LowStock (24h)' FROM AutoflowBizEvent SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Charges criadas (24h)",
+          "visualization": { "id": "viz.billboard" },
+          "layout": { "column": 5, "row": 16, "width": 4, "height": 2 },
+          "rawConfiguration": {
+            "thresholds": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT count(*) AS 'Charges criadas', sum(totalCents)/100 AS 'R$ total cobrado' FROM AutoflowBizEvent WHERE eventName='ChargeCreated' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Volume de eventos custom por tipo",
+          "visualization": { "id": "viz.bar" },
+          "layout": { "column": 9, "row": 16, "width": 4, "height": 2 },
+          "rawConfiguration": {
+            "facet": { "showOtherSeries": false },
+            "legend": { "enabled": false },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT count(*) FROM AutoflowBizEvent FACET eventName SINCE 1 hour ago LIMIT 30"
               }
             ]
           }
@@ -119,7 +234,7 @@
     },
     {
       "name": "APM",
-      "description": "",
+      "description": "Throughput, latência, erros e Apdex dos microsserviços autoflow-*.",
       "widgets": [
         {
           "title": "Throughput por serviço (rpm)",
@@ -131,7 +246,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT rate(count(*), 1 minute) AS rpm FROM Transaction FACET appName TIMESERIES SINCE 1 hour ago"
+                "query": "SELECT rate(count(*), 1 minute) AS rpm FROM Transaction WHERE appName LIKE 'autoflow-%' FACET appName TIMESERIES SINCE 1 hour ago"
               }
             ]
           }
@@ -147,13 +262,13 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT percentile(duration*1000, 95) FROM Transaction FACET appName TIMESERIES SINCE 1 hour ago"
+                "query": "SELECT percentile(duration*1000, 95) FROM Transaction WHERE appName LIKE 'autoflow-%' FACET appName TIMESERIES SINCE 1 hour ago"
               }
             ]
           }
         },
         {
-          "title": "Erros por serviço (5xx + exceptions)",
+          "title": "Erros por serviço (TransactionError)",
           "visualization": { "id": "viz.stacked-bar" },
           "layout": { "column": 1, "row": 4, "width": 6, "height": 3 },
           "rawConfiguration": {
@@ -162,7 +277,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT count(*) FROM TransactionError FACET appName TIMESERIES 5 minutes SINCE 1 hour ago"
+                "query": "SELECT count(*) FROM TransactionError WHERE appName LIKE 'autoflow-%' FACET appName TIMESERIES 5 minutes SINCE 1 hour ago"
               }
             ]
           }
@@ -176,7 +291,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT apdex(duration, t: 0.5) AS Apdex, average(duration*1000) AS 'Avg ms', count(*) AS Reqs FROM Transaction FACET appName SINCE 1 hour ago"
+                "query": "SELECT apdex(duration, t: 0.5) AS Apdex, average(duration*1000) AS 'Avg ms', count(*) AS Reqs FROM Transaction WHERE appName LIKE 'autoflow-%' FACET appName SINCE 1 hour ago"
               }
             ]
           }
@@ -190,7 +305,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT average(duration*1000) AS 'Avg ms', percentile(duration*1000, 95) AS 'p95 ms', count(*) AS Reqs FROM Transaction FACET appName, name LIMIT 10 SINCE 1 hour ago"
+                "query": "SELECT average(duration*1000) AS 'Avg ms', percentile(duration*1000, 95) AS 'p95 ms', count(*) AS Reqs FROM Transaction WHERE appName LIKE 'autoflow-%' FACET appName, name LIMIT 10 SINCE 1 hour ago"
               }
             ]
           }
