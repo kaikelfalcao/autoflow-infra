@@ -88,7 +88,7 @@ O autoflow tem **6 microsserviços** + 2 sidecars de infra (Kong + RabbitMQ). A 
 - **Custom events** via `recordCustomEvent('AutoflowBizEvent', ...)` → 11 tipos de eventos de negócio (`OrderCreated`, `SagaReserved`, `StockInsufficient`, `ChargeCreated` etc).
 - **Logs canônicos** via Winston: 1 entrada por request HTTP + 1 por evento RMQ processado, com `correlationId` propagado pelo header `x-correlation-id`.
 - Dashboard em [`observability/dashboard.json`](../observability/dashboard.json), provisionado via [`provision-dashboard.sh`](../observability/provision-dashboard.sh) (NerdGraph).
-- **TODO**: SonarQube Community Edition (self-hosted) para análise estática de qualidade — atualmente o gate é threshold de coverage do Jest (80%) + ESLint.
+- **Análise estática**: CodeQL via GitHub Actions em cada repo (`.github/workflows/codeQL.yml`) varre vulnerabilidades a cada push/PR. Gate de cobertura segue threshold de Jest (80%) + ESLint.
 
 ### Container e deploy
 
@@ -116,7 +116,7 @@ O autoflow tem **6 microsserviços** + 2 sidecars de infra (Kong + RabbitMQ). A 
 | Sem MongoDB transactions                       | Lock otimista via `versionKey`. Em alta concorrência, retry adiciona latência (aceito para o volume esperado). |
 | RabbitMQ at-least-once → consumers idempotentes | Toda lógica de domínio precisa lidar com reentrega. Adiciona complexidade local mas evita perda de mensagens. |
 | Kong sem JWT plugin (validação dentro de cada serviço) | Cada serviço carrega `@nestjs/jwt`. Em troca, lógica de auth fica próxima ao domínio + Kong DB-less mais simples. |
-| `SonarQube` removido temporariamente          | Coverage Jest cobre quality gate básico. Voltar com Community edition self-hosted é TODO documentado. |
+| `SonarCloud` substituído por CodeQL           | CodeQL é nativo do GitHub (sem token externo, sem custo), foca em segurança. Coverage continua via threshold do Jest. |
 | Migration job antes do rollout                | Sequência manual de aplicação (job → deploy). Falha de migration trava o deploy — comportamento desejado. |
 
 ---

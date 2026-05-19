@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Propaga secrets (DockerHub, AWS Lab, New Relic, SonarCloud) para os 7 repos do
+# Propaga secrets (DockerHub, AWS Lab, New Relic) para os 7 repos do
 # ecossistema autoflow via `gh secret set`. Lê valores de um arquivo .env (default:
 # .env na raiz de autoflow-infra). Use o template `.env.secrets.example` como base.
 #
@@ -26,7 +26,6 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # Lista de secrets a propagar (chaves que serão buscadas no ENV_FILE)
-# Opcionais (sem fail se ausentes): SONAR_TOKEN
 SECRETS=(
   DOCKER_USERNAME
   DOCKER_PASSWORD
@@ -34,11 +33,10 @@ SECRETS=(
   AWS_SECRET_ACCESS_KEY
   AWS_SESSION_TOKEN
   NEW_RELIC_LICENSE_KEY
-  SONAR_TOKEN
 )
 
 # Secrets opcionais — não falham se ausentes (apenas avisam)
-OPTIONAL_SECRETS=(SONAR_TOKEN)
+OPTIONAL_SECRETS=()
 
 REPOS=(
   autoflow-identity-service

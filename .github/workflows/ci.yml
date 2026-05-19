@@ -56,5 +56,5 @@ jobs:
           # falha apenas em erros, não warnings
           ! grep -q '\[error\]' yamllint.log
 
-  # TODO: integrar SonarQube Community Edition (self-hosted) para emitir relatórios
-  # de qualidade da infra (terraform-compliance, tfsec, checkov).
+  # Análise estática da infra fica como TODO: tfsec/checkov rodando como step
+  # opcional aqui (CodeQL não cobre HCL).

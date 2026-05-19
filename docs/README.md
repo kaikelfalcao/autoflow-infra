@@ -7,7 +7,6 @@ Documentação de arquitetura do ecossistema **autoflow** (FIAP Tech Challenge �
 | [01-architecture.md](./01-architecture.md) | Diagrama geral dos 6 microsserviços, bancos, mensageria. Fluxo end-to-end de uma OS. Camada de edge (Kong) e observabilidade. |
 | [02-saga-pattern.md](./02-saga-pattern.md) | Estratégia de transações distribuídas: **modelo híbrido** — coreografia para o fluxo principal, orquestração para o sub-fluxo de estoque. Idempotência e tratamento de falhas. |
 | [03-design-decisions.md](./03-design-decisions.md) | Justificativa da divisão dos 6 microsserviços. Stack: NestJS, Postgres, MongoDB, RabbitMQ, Kong, New Relic, kind/EKS. Trade-offs assumidos. |
-| [04-sonarcloud-setup.md](./04-sonarcloud-setup.md) | Setup do SonarCloud para validação de qualidade no CI (cobertura, code smells, security). |
 
 Os diagramas estão em **Mermaid** — renderizam nativamente no GitHub e na maioria dos visualizadores Markdown.
 

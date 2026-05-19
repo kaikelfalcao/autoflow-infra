@@ -103,6 +103,18 @@ resource "aws_launch_template" "nodes" {
     instance_metadata_tags      = "enabled"
   }
 
+  # AWS exige que disk size venha do launch template quando há launch_template
+  # no node group (mudança de 2024). Não dá pra usar disk_size no node_group.
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_size           = var.node_disk_size
+      volume_type           = "gp3"
+      delete_on_termination = true
+      encrypted             = true
+    }
+  }
+
   tag_specifications {
     resource_type = "instance"
     tags = {
@@ -119,7 +131,8 @@ resource "aws_eks_node_group" "default" {
 
   instance_types = var.node_instance_types
   capacity_type  = "ON_DEMAND"
-  disk_size      = var.node_disk_size
+  # disk_size é definido no launch_template (block_device_mappings) — AWS não
+  # aceita ambos quando o node group tem launch_template configurado.
 
   scaling_config {
     desired_size = var.node_desired_size
@@ -163,11 +176,14 @@ resource "aws_eks_addon" "vpc_cni" {
 }
 
 # EBS CSI driver — provisiona PVCs com StorageClass gp3.
+# Sem OIDC/IRSA configurado, o driver usa o role do node (LabRole no AWS
+# Academy, já com permissões EBS). Setar service_account_role_arn sem OIDC
+# faz o pod travar em "CREATING" porque a service account não consegue
+# assumir o role.
 resource "aws_eks_addon" "ebs_csi" {
-  cluster_name             = aws_eks_cluster.this.name
-  addon_name               = "aws-ebs-csi-driver"
-  service_account_role_arn = data.aws_iam_role.lab_role.arn
-  depends_on               = [aws_eks_node_group.default]
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "aws-ebs-csi-driver"
+  depends_on   = [aws_eks_node_group.default]
 }
 
 # StorageClass gp3 default — kubernetes_manifest exige kube apiserver disponível.
