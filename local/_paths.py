@@ -17,6 +17,9 @@ import urllib.request
 
 BASE = os.environ.get("AUTOFLOW_BASE_URL", "http://localhost:8080")
 NS = "autoflow"
+# Se setado, é injetado como X-Correlation-Id em toda chamada HTTP. Útil pra
+# demos de rastreamento distribuído — propaga via envelope de eventos RMQ.
+DEMO_CID = os.environ.get("AUTOFLOW_CORRELATION_ID", "")
 
 C_RESET = "\033[0m"
 C_CYAN = "\033[1;36m"
@@ -73,6 +76,8 @@ def http(method: str, path: str, body=None, headers=None, show: bool = True):
             print(f"  {C_DIM}> body:{C_RESET} {json.dumps(body, ensure_ascii=False)}")
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Content-Type", "application/json")
+    if DEMO_CID:
+        req.add_header("X-Correlation-Id", DEMO_CID)
     for k, v in (headers or {}).items():
         req.add_header(k, v)
     try:
