@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Propaga secrets (DockerHub, AWS Lab, New Relic) para os 7 repos do ecossistema
-# autoflow via `gh secret set`. Lê valores de um arquivo .env (default: .env na
-# raiz de autoflow-infra). Use o template `.env.secrets.example` como base.
+# Propaga secrets (DockerHub, AWS Lab, New Relic, SonarCloud) para os 7 repos do
+# ecossistema autoflow via `gh secret set`. Lê valores de um arquivo .env (default:
+# .env na raiz de autoflow-infra). Use o template `.env.secrets.example` como base.
 #
 # Uso:
 #   scripts/sync-github-secrets.sh                  # lê ./.env
@@ -26,6 +26,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # Lista de secrets a propagar (chaves que serão buscadas no ENV_FILE)
+# Opcionais (sem fail se ausentes): SONAR_TOKEN
 SECRETS=(
   DOCKER_USERNAME
   DOCKER_PASSWORD
@@ -33,7 +34,11 @@ SECRETS=(
   AWS_SECRET_ACCESS_KEY
   AWS_SESSION_TOKEN
   NEW_RELIC_LICENSE_KEY
+  SONAR_TOKEN
 )
+
+# Secrets opcionais — não falham se ausentes (apenas avisam)
+OPTIONAL_SECRETS=(SONAR_TOKEN)
 
 REPOS=(
   autoflow-identity-service
@@ -53,16 +58,33 @@ set -a
 . "$ENV_FILE"
 set +a
 
-# Valida que todas as secrets existem e não estão vazias
+# Valida que todas as secrets obrigatórias existem e não estão vazias
+is_optional() {
+  local key="$1"
+  for opt in "${OPTIONAL_SECRETS[@]}"; do
+    [ "$opt" = "$key" ] && return 0
+  done
+  return 1
+}
+
 missing=()
+warnings=()
 for s in "${SECRETS[@]}"; do
   if [ -z "${!s:-}" ]; then
-    missing+=("$s")
+    if is_optional "$s"; then
+      warnings+=("$s")
+    else
+      missing+=("$s")
+    fi
   fi
 done
 if [ ${#missing[@]} -gt 0 ]; then
-  echo "✗ Variáveis ausentes/vazias em $ENV_FILE: ${missing[*]}"
+  echo "✗ Variáveis obrigatórias ausentes/vazias em $ENV_FILE: ${missing[*]}"
   exit 1
+fi
+if [ ${#warnings[@]} -gt 0 ]; then
+  echo "⚠ Opcionais ausentes (não bloqueia): ${warnings[*]}"
+  echo ""
 fi
 
 # Confere autenticação gh
@@ -79,6 +101,11 @@ echo ""
 for repo in "${REPOS[@]}"; do
   echo "  ▸ $repo"
   for s in "${SECRETS[@]}"; do
+    # Pula opcionais vazios
+    if [ -z "${!s:-}" ] && is_optional "$s"; then
+      printf '      ◦ %s (skip — não definida)\n' "$s"
+      continue
+    fi
     if printf '%s' "${!s}" | gh secret set "$s" --repo "$OWNER/$repo" --body - >/dev/null 2>&1; then
       printf '      ✓ %s\n' "$s"
     else
