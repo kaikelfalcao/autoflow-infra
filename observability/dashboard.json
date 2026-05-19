@@ -53,24 +53,37 @@
           }
         },
         {
-          "title": "Status atual das OSs (distribuição)",
-          "visualization": { "id": "viz.pie" },
-          "layout": { "column": 1, "row": 4, "width": 4, "height": 3 },
+          "title": "OSs ativas — status atual por orderId",
+          "visualization": { "id": "viz.table" },
+          "layout": { "column": 1, "row": 4, "width": 5, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
-            "legend": { "enabled": true },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT latest(toStatus) FROM AutoflowBizEvent WHERE eventName='OrderStatusChanged' FACET orderId SINCE 1 day ago LIMIT MAX"
+                "query": "SELECT latest(toStatus) AS 'Status atual', count(*) AS 'Transições (24h)' FROM AutoflowBizEvent WHERE eventName='OrderStatusChanged' FACET orderId SINCE 1 day ago LIMIT 100"
               }
             ]
           }
         },
         {
-          "title": "Tempo médio de execução de OS (s)",
+          "title": "OSs por destino de status (24h, único por orderId)",
+          "visualization": { "id": "viz.billboard" },
+          "layout": { "column": 6, "row": 4, "width": 3, "height": 3 },
+          "rawConfiguration": {
+            "thresholds": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT filter(uniqueCount(orderId), WHERE toStatus='IN_DIAGNOSIS') AS 'Em diagnóstico', filter(uniqueCount(orderId), WHERE toStatus='WAITING_APPROVAL') AS 'Aguardando aprovação', filter(uniqueCount(orderId), WHERE toStatus='IN_EXECUTION') AS 'Em execução', filter(uniqueCount(orderId), WHERE toStatus='READY') AS 'Prontas', filter(uniqueCount(orderId), WHERE toStatus='DELIVERED') AS 'Entregues', filter(uniqueCount(orderId), WHERE toStatus='CANCELLED') AS 'Canceladas' FROM AutoflowBizEvent WHERE eventName='OrderStatusChanged' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Tempo de execução de OS (s)",
           "visualization": { "id": "viz.line" },
-          "layout": { "column": 5, "row": 4, "width": 4, "height": 3 },
+          "layout": { "column": 9, "row": 4, "width": 4, "height": 3 },
           "rawConfiguration": {
             "legend": { "enabled": true },
             "yAxisLeft": { "zero": true },
@@ -85,28 +98,13 @@
         {
           "title": "OS canceladas (motivos)",
           "visualization": { "id": "viz.table" },
-          "layout": { "column": 9, "row": 4, "width": 4, "height": 3 },
+          "layout": { "column": 1, "row": 7, "width": 6, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
                 "query": "SELECT count(*) AS 'Qtd', latest(changedBy) AS 'Por' FROM AutoflowBizEvent WHERE eventName='OrderCancelled' FACET reason SINCE 1 day ago LIMIT 20"
-              }
-            ]
-          }
-        },
-        {
-          "title": "Saga: tempo médio (reserva e completa, em s)",
-          "visualization": { "id": "viz.line" },
-          "layout": { "column": 1, "row": 7, "width": 6, "height": 3 },
-          "rawConfiguration": {
-            "legend": { "enabled": true },
-            "yAxisLeft": { "zero": true },
-            "nrqlQueries": [
-              {
-                "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT average(elapsedMs)/1000 AS 'Reserva (s)', average(totalElapsedMs)/1000 AS 'Saga completa (s)' FROM AutoflowBizEvent WHERE eventName IN ('SagaReserved','SagaConsumed') TIMESERIES SINCE 1 hour ago"
               }
             ]
           }
@@ -127,9 +125,24 @@
           }
         },
         {
+          "title": "Saga: tempo médio (reserva e completa, em s)",
+          "visualization": { "id": "viz.line" },
+          "layout": { "column": 1, "row": 10, "width": 6, "height": 3 },
+          "rawConfiguration": {
+            "legend": { "enabled": true },
+            "yAxisLeft": { "zero": true },
+            "nrqlQueries": [
+              {
+                "accountIds": [__ACCOUNT_ID__],
+                "query": "SELECT filter(average(elapsedMs)/1000, WHERE eventName='SagaReserved') AS 'Reserva (s)', filter(average(totalElapsedMs)/1000, WHERE eventName='SagaConsumed') AS 'Saga completa (s)' FROM AutoflowBizEvent TIMESERIES SINCE 1 hour ago"
+              }
+            ]
+          }
+        },
+        {
           "title": "Compensações de saga (origem)",
           "visualization": { "id": "viz.table" },
-          "layout": { "column": 1, "row": 10, "width": 5, "height": 3 },
+          "layout": { "column": 7, "row": 10, "width": 6, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "nrqlQueries": [
@@ -143,7 +156,7 @@
         {
           "title": "Movimento de estoque (RESERVE + CONSUME)",
           "visualization": { "id": "viz.line" },
-          "layout": { "column": 6, "row": 10, "width": 7, "height": 3 },
+          "layout": { "column": 1, "row": 13, "width": 12, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": true },
@@ -159,7 +172,7 @@
         {
           "title": "Estoque insuficiente (peças que travaram saga)",
           "visualization": { "id": "viz.table" },
-          "layout": { "column": 1, "row": 13, "width": 6, "height": 3 },
+          "layout": { "column": 1, "row": 16, "width": 6, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "nrqlQueries": [
@@ -173,13 +186,13 @@
         {
           "title": "Alertas de estoque mínimo (StockLowAlert)",
           "visualization": { "id": "viz.table" },
-          "layout": { "column": 7, "row": 13, "width": 6, "height": 3 },
+          "layout": { "column": 7, "row": 16, "width": 6, "height": 3 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT latest(name) AS 'Peça', latest(sku) AS 'SKU', latest(currentStock) AS 'Estoque atual', latest(minimumStock) AS 'Mínimo', latest(timestamp) AS 'Última detecção' FROM AutoflowBizEvent WHERE eventName='StockLowAlert' FACET partId SINCE 1 week ago LIMIT 50"
+                "query": "SELECT count(*) AS 'Alertas', latest(name) AS 'Peça', latest(sku) AS 'SKU', latest(currentStock) AS 'Estoque atual', latest(minimumStock) AS 'Mínimo' FROM AutoflowBizEvent WHERE eventName='StockLowAlert' FACET partId SINCE 1 week ago LIMIT 50"
               }
             ]
           }
@@ -187,7 +200,7 @@
         {
           "title": "Estoque insuficiente vs alertas mínimo (contadores)",
           "visualization": { "id": "viz.billboard" },
-          "layout": { "column": 1, "row": 16, "width": 4, "height": 2 },
+          "layout": { "column": 1, "row": 19, "width": 4, "height": 2 },
           "rawConfiguration": {
             "thresholds": [
               { "alertSeverity": "WARNING", "value": 1 },
@@ -204,13 +217,13 @@
         {
           "title": "Charges criadas (24h)",
           "visualization": { "id": "viz.billboard" },
-          "layout": { "column": 5, "row": 16, "width": 4, "height": 2 },
+          "layout": { "column": 5, "row": 19, "width": 4, "height": 2 },
           "rawConfiguration": {
             "thresholds": [],
             "nrqlQueries": [
               {
                 "accountIds": [__ACCOUNT_ID__],
-                "query": "SELECT count(*) AS 'Charges criadas', sum(totalCents)/100 AS 'R$ total cobrado' FROM AutoflowBizEvent WHERE eventName='ChargeCreated' SINCE 1 day ago"
+                "query": "SELECT count(*) AS 'Charges criadas', sum(totalCents)/100 AS 'R$ total solicitado' FROM AutoflowBizEvent WHERE eventName='ChargeCreated' SINCE 1 day ago"
               }
             ]
           }
@@ -218,7 +231,7 @@
         {
           "title": "Volume de eventos custom por tipo",
           "visualization": { "id": "viz.bar" },
-          "layout": { "column": 9, "row": 16, "width": 4, "height": 2 },
+          "layout": { "column": 9, "row": 19, "width": 4, "height": 2 },
           "rawConfiguration": {
             "facet": { "showOtherSeries": false },
             "legend": { "enabled": false },
