@@ -1,0 +1,93 @@
+# PostgreSQL local — substitui o RDS do ambiente AWS.
+# Sobe um único Postgres com 4 databases (identity, order, saga, payment).
+# Os databases e users são criados via initdb script no ConfigMap.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: autoflow
+data:
+  init-databases.sql: |
+    -- Cria 4 databases e 4 users, cada user owner do seu DB.
+    CREATE USER identity_user WITH PASSWORD 'identity_pass';
+    CREATE DATABASE identity OWNER identity_user;
+
+    CREATE USER order_user WITH PASSWORD 'order_pass';
+    CREATE DATABASE "order" OWNER order_user;
+
+    CREATE USER saga_user WITH PASSWORD 'saga_pass';
+    CREATE DATABASE saga OWNER saga_user;
+
+    CREATE USER payment_user WITH PASSWORD 'payment_pass';
+    CREATE DATABASE payment OWNER payment_user;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: autoflow
+spec:
+  clusterIP: None
+  ports:
+    - port: 5432
+      name: postgres
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: autoflow
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_DB
+              value: postgres
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  terraform:
+    name: terraform fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: terraform fmt -check (recursive)
+        run: terraform fmt -check -recursive
+
+      - name: terraform validate por módulo
+        run: |
+          for dir in 01-network-eks 02-database-rds; do
+            if [ -d "$dir" ]; then
+              echo "▸ validando $dir"
+              (cd "$dir" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+            fi
+          done
+
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck em scripts/*.sh e local/*.sh
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          find scripts local -maxdepth 2 -type f -name '*.sh' -print0 2>/dev/null \
+            | xargs -0 -r shellcheck -x -S warning || exit 1
+
+  yaml:
+    name: yamllint (k8s + workflows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: yamllint relaxed
+        run: |
+          pip install --quiet yamllint
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" \
+            03-k8s-shared 04-services 05-kong .github 2>&1 | tee yamllint.log
+          # falha apenas em erros, não warnings
+          ! grep -q '\[error\]' yamllint.log
+
+  # Análise estática da infra fica como TODO: tfsec/checkov rodando como step
+  # opcional aqui (CodeQL não cobre HCL).

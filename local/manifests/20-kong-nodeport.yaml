@@ -1,0 +1,22 @@
+# Após instalar Kong via Helm (que cria service tipo LoadBalancer pendente
+# em kind), sobrescrevemos para NodePort 30080. O kind-config mapeia
+# host:8080 → containerPort:30080.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-kong-proxy
+  namespace: kong
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  type: NodePort
+  ports:
+    - name: kong-proxy
+      port: 80
+      targetPort: 8000
+      nodePort: 30080
+      protocol: TCP
+  selector:
+    app.kubernetes.io/component: app
+    app.kubernetes.io/instance: kong
+    app.kubernetes.io/name: kong
